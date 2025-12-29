@@ -24,32 +24,7 @@ class Sim(Node):
         model_path = os.path.join(current_dir, 'franka_emika_panda/panda.xml')
 
         self._model = mujoco.MjModel.from_xml_path(model_path)
-        self._data = mujoco.MjData(self._model)
-
-        # --- DEBUGGING BLOCK START ---
-        print(f"Model loaded from: {model_path}")
-        print(f"Number of Bodies: {self._model.nbody}")
-        print(f"Number of Sites: {self._model.nsite}")
-        
-        print("Available Body Names:")
-        for i in range(self._model.nbody):
-            name = mujoco.mj_id2name(self._model, mujoco.mjtObj.mjOBJ_BODY, i)
-            print(f"  - {name}")
-
-        print("Available Site Names:")
-        if self._model.nsite > 0:
-            for i in range(self._model.nsite):
-                name = mujoco.mj_id2name(self._model, mujoco.mjtObj.mjOBJ_SITE, i)
-                print(f"  - {name}")
-        else:
-            print("  (None found! This is the problem.)")
-        # --- DEBUGGING BLOCK END ---
-
-
-        
-        self._mpc = Mpc(self._model, self._data)
-        self._target = np.array([0.5, 0.0, 0.5])
-        self._obs = np.array([0.3, 0.0, 0.3])
+        self._data = mujoco.MjData(self._model)   
 
         # Set Ready Pose
         self._data.qpos[:9] = [0.0,
@@ -60,17 +35,34 @@ class Sim(Node):
                                1.5707963267948966,
                                0.7853981633974483,
                                0.0, 0.0]
+        mujoco.mj_forward(self._model, self._data)
+
+        self._mpc = Mpc(self._model, self._data)
+        self._target = np.array([0.5, 0.0, 0.5])
+        self._obs = np.array([0.3, 0.0, 0.3])
+
         self._target = np.array([0.5, 0.0, 0.5])
         self._obs = np.array([0.5, 0.0, 0.3])
         self._timer = self.create_timer(0.01, self.timer_callback)
 
     def timer_callback(self):
         """Call callback function for timer."""
+        now = self.get_clock().now().nanoseconds / 1e9
+
+        # Move target in a slow circle (Radius 0.2m, Speed 0.5 rad/s)
+        self._target[0] = 0.5 + 0.2 * np.sin(now * 0.5)
+        self._target[1] = 0.0 + 0.2 * np.cos(now * 0.5)
+        self._target[2] = 0.5
+
         q = self._data.qpos[:7]
         q_dot = self._mpc.calculate_joint_vel(q, self._target, self._obs)
         self._data.qpos[:7] += q_dot * 0.01
         mujoco.mj_kinematics(self._model, self._data)
-
+        # --- Debugging Message-------------------------------------
+        current_pos = self._data.xpos[9]
+        dist = np.linalg.norm(self._target - current_pos)
+        print(f'Dist to Goal: {dist:.4f} | Hand: {current_pos}')
+        # ----------------------------------------------------------
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.name = ['panda_joint1', 'panda_joint2', 'panda_joint3',

@@ -29,6 +29,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        *recursive_files('share/' + package_name, 'launch'),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

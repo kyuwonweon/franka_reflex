@@ -15,6 +15,14 @@ class Mpc():
         self.threshold = 0.2  # Safety threshold from obstacle
         self.zeta = 5.0  # Attraction gain
         self.eta = 10.0  # Repulsion gain
+        self.k_pose = 2.0
+        self.ready_pos = [0.0,
+                          0.7853981633974483,
+                          0.0,
+                          -2.356194490192345,
+                          0.0,
+                          1.5707963267948966,
+                          0.7853981633974483]
 
     def calculate_joint_vel(self,
                             q: np.ndarray,
@@ -32,7 +40,9 @@ class Mpc():
         F = self.calculate_potential_force(current_pos, target_pos, obs_pos)
         J = self.calculate_jacobian()
         qdot = J.T @ F
-        return qdot
+        qdot_posture = self.k_pose * (self.ready_pos - q)
+        qdot_total = qdot + qdot_posture
+        return np.clip(qdot_total, -0.05, 0.05)
     
     def calculate_potential_force(self,
                                   current_pos: np.ndarray,

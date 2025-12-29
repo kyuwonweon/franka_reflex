@@ -2,7 +2,10 @@
 import numpy as np
 import mujoco
 
-class mpc():
+
+class Mpc():
+    """Controller for motion planning."""
+
     def __init__(self, model: mujoco.MjModel, data: mujoco.MjData):
         """Initialize all parameters."""
         self.model = model
@@ -38,7 +41,7 @@ class mpc():
                                   target_pos: np.ndarray,
                                   obs_pos: np.ndarray):
         """
-        Calculate potential force for motion planning
+        Calculate potential force for motion planning.
         
         :param current_pos: current cartesian position of the ee
         :param target_pos: target cartesian position of ee

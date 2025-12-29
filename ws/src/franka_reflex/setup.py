@@ -1,4 +1,23 @@
+"""Setup file for franka_reflex."""
+from pathlib import Path
+
 from setuptools import find_packages, setup
+
+
+def recursive_files(prefix, path):
+    """
+    Recurse over path returning a list of tuples.
+
+    :param prefix: prefix path to prepend to the path
+    :param path: Path to directory to recurse.
+    Path should not have a trailing '/'
+    :return: List of tuples. First element of each tuple is destination path,
+    second element is a list of files to copy to that path
+    """
+    return [(str(Path(prefix)/subdir),
+             [str(file) for file in subdir.glob('*') if not file.is_dir()])
+            for subdir in Path(path).glob('**')]
+
 
 package_name = 'franka_reflex'
 
@@ -15,8 +34,8 @@ setup(
     zip_safe=True,
     maintainer='kyuwon',
     maintainer_email='kyuwon0917@gmail.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    description='MPC for obstacle avoidance',
+    license='MIT',
     extras_require={
         'test': [
             'pytest',
@@ -24,6 +43,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'sim = franka_reflex.sim_node:main'
         ],
     },
 )

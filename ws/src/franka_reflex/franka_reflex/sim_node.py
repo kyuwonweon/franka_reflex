@@ -19,13 +19,35 @@ class Sim(Node):
 
     def __init__(self):
         """Initialize variables."""
-        super.__init__('sim')
+        super().__init__('sim')
         self._pub = self.create_publisher(JointState, 'joint_states', 10)
         model_path = os.path.join(current_dir, 'franka_emika_panda/panda.xml')
 
         self._model = mujoco.MjModel.from_xml_path(model_path)
-        self._data = mujoco.MjData(self.model)
-        self._mpc = Mpc(self.model, self.data)
+        self._data = mujoco.MjData(self._model)
+
+        # --- DEBUGGING BLOCK START ---
+        print(f"Model loaded from: {model_path}")
+        print(f"Number of Bodies: {self._model.nbody}")
+        print(f"Number of Sites: {self._model.nsite}")
+        
+        print("Available Body Names:")
+        for i in range(self._model.nbody):
+            name = mujoco.mj_id2name(self._model, mujoco.mjtObj.mjOBJ_BODY, i)
+            print(f"  - {name}")
+
+        print("Available Site Names:")
+        if self._model.nsite > 0:
+            for i in range(self._model.nsite):
+                name = mujoco.mj_id2name(self._model, mujoco.mjtObj.mjOBJ_SITE, i)
+                print(f"  - {name}")
+        else:
+            print("  (None found! This is the problem.)")
+        # --- DEBUGGING BLOCK END ---
+
+
+        
+        self._mpc = Mpc(self._model, self._data)
         self._target = np.array([0.5, 0.0, 0.5])
         self._obs = np.array([0.3, 0.0, 0.3])
 
@@ -37,7 +59,7 @@ class Sim(Node):
                                0.0,
                                1.5707963267948966,
                                0.7853981633974483,
-                               ]
+                               0.0, 0.0]
         self._target = np.array([0.5, 0.0, 0.5])
         self._obs = np.array([0.5, 0.0, 0.3])
         self._timer = self.create_timer(0.01, self.timer_callback)

@@ -10,9 +10,7 @@ class Mpc():
         """Initialize all parameters."""
         self.model = model
         self.data = data
-        self.ee_id = mujoco.mj_name2id(model,
-                                       mujoco.mjtObj.mjOBJ_SITE,
-                                       'attachment_site')
+        self.ee_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, 'hand')
         
         self.threshold = 0.2  # Safety threshold from obstacle
         self.zeta = 5.0  # Attraction gain
@@ -30,7 +28,7 @@ class Mpc():
         :param obs_pos: obstacle cartesian position [x,y,z]
         :return: joint velocity
         """
-        current_pos = self.data.site_xpos[self.ee_id]
+        current_pos = self.data.xpos[self.ee_id]
         F = self.calculate_potential_force(current_pos, target_pos, obs_pos)
         J = self.calculate_jacobian()
         qdot = J.T @ F
@@ -69,6 +67,6 @@ class Mpc():
     def calculate_jacobian(self):
         """Calculate Jacobian to transform force into joint torque."""
         j_init = np.zeros((3, self.model.nv))
-        mujoco.mj_jacSite(self.model, self.data, j_init, None, self.ee_id)
+        mujoco.mj_jacBody(self.model, self.data, j_init, None, self.ee_id)
         jacobian = j_init[:, :7]
         return jacobian

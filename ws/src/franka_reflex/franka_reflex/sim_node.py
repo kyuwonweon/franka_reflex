@@ -22,15 +22,17 @@ class Sim(Node):
         """Initialize variables."""
         super().__init__('sim')
         self._pub = self.create_publisher(JointState, 'joint_states', 10)
-        self.marker_pub = self.create_publisher(Marker, 'visualization_marker', 10)
+        self.marker_pub = self.create_publisher(Marker,
+                                                'visualization_marker',
+                                                10)
         model_path = os.path.join(current_dir, 'franka_emika_panda/panda.xml')
 
         self._model = mujoco.MjModel.from_xml_path(model_path)
-        self._data = mujoco.MjData(self._model)   
+        self._data = mujoco.MjData(self._model)
 
         # Set Ready Pose
         self._data.qpos[:9] = [0.0,
-                               0.7853981633974483,
+                               -0.7853981633974483,
                                0.0,
                                -2.356194490192345,
                                0.0,
@@ -40,10 +42,7 @@ class Sim(Node):
         mujoco.mj_forward(self._model, self._data)
 
         self._mpc = Mpc(self._model, self._data)
-        self._target = np.array([0.5, 0.0, 0.5])
-        self._obs = np.array([0.3, 0.0, 0.3])
-
-        self._target = np.array([0.5, 0.0, 0.5])
+        self._target = np.array([0.6, 0.2, 0.5])
         self._obs = np.array([0.5, 0.0, 0.3])
         self._timer = self.create_timer(0.01, self.timer_callback)
 
@@ -66,17 +65,25 @@ class Sim(Node):
         marker.type = Marker.SPHERE
         marker.action = Marker.ADD
         marker.id = marker_id
-        marker.pose.position.x = center[0]
-        marker.pose.position.y = center[1]
-        marker.pose.position.z = center[2]
+        marker.pose.position.x = float(center[0])
+        marker.pose.position.y = float(center[1])
+        marker.pose.position.z = float(center[2])
         marker.color.a = 1.0
-        marker.color.r = color[0]
-        marker.color.g = color[1]
-        marker.color.b = color[2]
+        marker.color.r = float(color[0])
+        marker.color.g = float(color[1])
+        marker.color.b = float(color[2])
         marker.scale.x = scale
         marker.scale.y = scale
         marker.scale.z = scale
         self.marker_pub.publish(marker)
+
+    def path_marker(self):
+        """
+        Create a marker for tracking the path for ee pose.
+
+        :param self: Description
+        """
+        return
 
     def timer_callback(self):
         """Call callback function for timer."""

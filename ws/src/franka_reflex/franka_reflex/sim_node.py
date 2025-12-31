@@ -42,8 +42,8 @@ class Sim(Node):
         mujoco.mj_forward(self._model, self._data)
 
         self._mpc = Mpc(self._model, self._data)
-        self._target = np.array([0.6, 0.2, 0.5])
-        self._obs = np.array([0.5, 0.0, 0.3])
+        self._target = np.array([0.8, 0.2, 0.0])
+        self._obs = np.array([0.5, 0.0, 0.5])
         self._timer = self.create_timer(0.01, self.timer_callback)
 
     def sphere_marker(self,
@@ -108,12 +108,12 @@ class Sim(Node):
         # Publihs marker fro obstacle in red
         self.sphere_marker(self._obs,
                            color=[1.0, 0.0, 0.0],
-                           scale=0.3,
+                           scale=0.2,
                            marker_id=0)
         # Publihs marker for target in green
         self.sphere_marker(self._target,
                            color=[0.0, 1.0, 0.0],
-                           scale=0.1,
+                           scale=0.025,
                            marker_id=1)
 
 

@@ -24,9 +24,9 @@ class Mpc():
         self.ee_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, 'hand')
 
         self.threshold = 0.15  # Safety threshold from obstacle
-        self.zeta = 10.0  # Attraction gain
+        self.zeta = 15.0  # Attraction gain
         self.eta = 20.0  # Repulsion gain
-        self.k_pose = 2.0
+        self.k_pose = 0.01
         self.ready_pos = [0.0,
                           -0.7853981633974483,
                           0.0,
@@ -41,19 +41,26 @@ class Mpc():
                             obs_pos: np.ndarray) -> np.ndarray:
         """
         Calculate output joint velocity.
-
+        
         :param q: current joint configuration
         :param target_pos: target cartesian postion [x,y,z]
         :param obs_pos: obstacle cartesian position [x,y,z]
         :return: joint velocity
         """
         total_forces = np.zeros(7)
+
+        # Find the ee position offsetted from the hand
+        hand_pos = self.data.xpos[self.ee_id]
+        hand_rot = self.data.xmat[self.ee_id].reshape(3, 3)
+        offset = np.array([0.0, 0.0, 0.1])
+        ee_pos = hand_pos + hand_rot @ offset
+
         for body in self.bodies:
             current_pos = self.data.xpos[body]
             f_rep = self.calculate_repulsion(current_pos, obs_pos)
             f_att = np.zeros(3)
             if body == self.ee_id:
-                error = target_pos - current_pos
+                error = target_pos - ee_pos
                 f_att = self.zeta * error
             F = f_att + f_rep
             J = self.calculate_jacobian(body)

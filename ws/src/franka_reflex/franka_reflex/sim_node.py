@@ -2,7 +2,8 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from visualization_msgs.msg import Marker
+from visualization_msgs.msg import Marker, InteractiveMarker, InteractiveMarkerControl
+from interactive_markers.interactive_marker_server import InteractiveMarkerServer
 import mujoco
 
 import numpy as np
@@ -25,6 +26,7 @@ class Sim(Node):
         self.marker_pub = self.create_publisher(Marker,
                                                 'visualization_marker',
                                                 10)
+        self._server = InteractiveMarkerServer(self, 'interactive_marker')
         model_path = os.path.join(current_dir, 'franka_emika_panda/panda.xml')
 
         self._model = mujoco.MjModel.from_xml_path(model_path)
@@ -42,8 +44,10 @@ class Sim(Node):
         mujoco.mj_forward(self._model, self._data)
 
         self._mpc = Mpc(self._model, self._data)
-        self._target = np.array([0.8, 0.2, 0.0])
-        self._obs = np.array([0.5, 0.0, 0.5])
+        self._target = np.array([0.5, 0.3, 0.5])
+        self._obs = np.array([0.45, 0.05, 0.5])
+
+        self.interactive_sphere_marker()
         self._timer = self.create_timer(0.01, self.timer_callback)
 
     def sphere_marker(self,
@@ -77,13 +81,70 @@ class Sim(Node):
         marker.scale.z = scale
         self.marker_pub.publish(marker)
 
-    def path_marker(self):
-        """
-        Create a marker for tracking the path for ee pose.
+    def interactive_sphere_marker(self):
+        """Create a interactive, draggable sphere."""
+        int_marker = InteractiveMarker()
+        int_marker.header.frame_id = 'world'
+        int_marker.name = 'target'
+        int_marker.scale = 0.2
+        int_marker.pose.position.x = self._target[0]
+        int_marker.pose.position.y = self._target[1]
+        int_marker.pose.position.z = self._target[2]
 
-        :param self: Description
+        control = InteractiveMarkerControl()
+        control.always_visible = True
+        control.interaction_mode = InteractiveMarkerControl.MOVE_3D
+        marker = Marker()
+        marker.type = Marker.SPHERE
+        marker.scale.x = 0.05
+        marker.scale.y = 0.05
+        marker.scale.z = 0.05
+        marker.color.r = 0.0
+        marker.color.g = 1.0
+        marker.color.b = 0.0
+        marker.color.a = 1.0
+
+        control.markers.append(marker)
+        int_marker.controls.append(control)
+
+        self.axis_control(int_marker, 1, 0, 0, 'move_x')
+        self.axis_control(int_marker, 0, 1, 0, 'move_y')
+        self.axis_control(int_marker, 0, 0, 1, 'move_z')
+
+        self._server.insert(int_marker,
+                            feedback_callback=self.fb_callback)
+        self._server.applyChanges()
+
+    def axis_control(self, marker, x, y, z, name):
         """
-        return
+        Add arrows in cartesain axis directions.
+
+        :param marker: interactive marker that will have this axis control
+        :param x: cartesian x
+        :param y: cartesian y
+        :param z: cartesian z
+        :param name: name of each axis
+        """
+        control = InteractiveMarkerControl()
+        control.orientation.x = float(x)
+        control.orientation.y = float(y)
+        control.orientation.z = float(z)
+        control.orientation.w = 1.0
+        control.name = name
+        control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
+        control.always_visible = True
+        marker.controls.append(control)
+
+    def fb_callback(self, feedback):
+        """
+        Update target with feedback.
+
+        :param feedback: feedback from the control server
+        """
+        if feedback.event_type == feedback.POSE_UPDATE:
+            self._target[0] = feedback.pose.position.x
+            self._target[1] = feedback.pose.position.y
+            self._target[2] = feedback.pose.position.z
 
     def timer_callback(self):
         """Call callback function for timer."""
@@ -92,9 +153,16 @@ class Sim(Node):
         self._data.qpos[:7] += q_dot * 0.01
         mujoco.mj_kinematics(self._model, self._data)
         # --- Debugging Message-------------------------------------
-        current_pos = self._data.xpos[9]
-        dist = np.linalg.norm(self._target - current_pos)
-        print(f'Dist to Goal: {dist:.4f} | Hand: {current_pos}')
+        wrist_pos = self._data.xpos[9]
+        wrist_rot = self._data.xmat[9].reshape(3, 3)
+        
+        # 2. Calculate Tip Pos (Same math as MPC)
+        offset = np.array([0.0, 0.0, 0.1]) 
+        tip_pos = wrist_pos + wrist_rot @ offset
+        
+        # 3. Calculate Real Error
+        real_dist = np.linalg.norm(self._target - tip_pos)
+        print(f'Tip Error: {real_dist:.4f} | Wrist Dist: {np.linalg.norm(self._target - wrist_pos):.4f}')
         # ----------------------------------------------------------
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
@@ -110,11 +178,6 @@ class Sim(Node):
                            color=[1.0, 0.0, 0.0],
                            scale=0.2,
                            marker_id=0)
-        # Publihs marker for target in green
-        self.sphere_marker(self._target,
-                           color=[0.0, 1.0, 0.0],
-                           scale=0.025,
-                           marker_id=1)
 
 
 def main():
